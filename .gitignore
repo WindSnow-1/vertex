@@ -1,0 +1,4 @@
+*.exe
+vertex-proxy
+vertex-proxy-linux
+*.log
