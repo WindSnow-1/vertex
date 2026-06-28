@@ -1,2 +1,7 @@
 *.exe
 *.log
+config/keys.json
+config/nodes.json
+config/node_health.json
+config/proxies.json
+config/config.json
