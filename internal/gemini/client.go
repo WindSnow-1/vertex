@@ -436,6 +436,41 @@ func candidateFinish(result map[string]any) string {
 	return ""
 }
 
+func chunkHasContent(ch map[string]any) bool {
+	cands, ok := ch["candidates"].([]any)
+	if !ok || len(cands) == 0 {
+		return false
+	}
+	c, ok := cands[0].(map[string]any)
+	if !ok {
+		return false
+	}
+	content, ok := c["content"].(map[string]any)
+	if !ok {
+		return false
+	}
+	parts, ok := content["parts"].([]any)
+	if !ok {
+		return false
+	}
+	for _, pRaw := range parts {
+		p, ok := pRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if p["thought"] == true {
+			continue
+		}
+		if toStr(p["text"]) != "" {
+			return true
+		}
+		if isFunctionCallWithName(p) {
+			return true
+		}
+	}
+	return false
+}
+
 // --- Streaming core ---
 
 func (c *Client) streamInner(ctx context.Context, model string, geminiPayload map[string]any, proxyURI string, yield func(streamChunk) bool) {
@@ -477,7 +512,9 @@ func (c *Client) streamInner(ctx context.Context, model string, geminiPayload ma
 		chunkCount := 0
 		attemptErr := c.executeStreamingAttempt(ctx, sess, model, geminiPayload, recaptchaToken, func(ch map[string]any) bool {
 			chunkCount++
-			contentYielded = true
+			if chunkHasContent(ch) {
+				contentYielded = true
+			}
 			return yield(streamChunk{Data: ch})
 		})
 
@@ -728,6 +765,7 @@ func streamParallel(ctx context.Context, cfg *config.AppConfig, op func(ctx cont
 	}
 
 	var winner *res
+loop:
 	for atomic.LoadInt32(&active) > 0 {
 		select {
 		case r := <-resCh:
@@ -737,8 +775,7 @@ func streamParallel(ctx context.Context, cfg *config.AppConfig, op func(ctx cont
 				winner = &r
 				log.Printf("[racing] stream node %s won", name)
 				nodes.RecordTest(r.uri, true, 50, "")
-				cancel()
-				goto consume
+				break loop
 			} else if r.err != nil && ctx.Err() == nil && !errors.Is(r.err, context.Canceled) {
 				log.Printf("[racing] stream node %s failed: %s", name, r.err.Error())
 				nodes.RecordTest(r.uri, false, 0, r.err.Error())
@@ -747,8 +784,6 @@ func streamParallel(ctx context.Context, cfg *config.AppConfig, op func(ctx cont
 			return
 		}
 	}
-
-consume:
 	if winner != nil {
 		if !yield(winner.first) {
 			return

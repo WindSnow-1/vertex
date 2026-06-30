@@ -79,51 +79,55 @@ func (c *Client) oaiFakeStream(ctx context.Context, w http.ResponseWriter, model
 
 	oai := geminiToOAI(resp, model)
 	contentText := firstChoiceContent(oai)
+	reasoningText := firstChoiceReasoning(oai)
 
 	createdTS := time.Now().Unix()
-	chunks := splitIntoRuneChunks(contentText)
-	for i, piece := range chunks {
+
+	isFirst := true
+	sendChunk := func(delta map[string]any, finish bool) bool {
 		base := map[string]any{
 			"id":      "chatcmpl-" + requestID,
 			"object":  "chat.completion.chunk",
 			"created": createdTS,
 			"model":   model,
 		}
-		var delta map[string]any
-		if i == 0 {
-			delta = map[string]any{"role": "assistant", "content": piece}
-		} else {
-			delta = map[string]any{"content": piece}
+		if isFirst {
+			delta["role"] = "assistant"
+			isFirst = false
 		}
 		choice := map[string]any{"index": 0, "delta": delta}
-		if i == len(chunks)-1 {
+		if finish {
 			choice["finish_reason"] = "stop"
 		}
 		base["choices"] = []any{choice}
-		if !sw.write(sseLine(base)) {
+		return sw.write(sseLine(base))
+	}
+
+	if reasoningText != "" {
+		for _, piece := range splitIntoRuneChunks(reasoningText) {
+			if !sendChunk(map[string]any{"reasoning_content": piece}, false) {
+				return
+			}
+		}
+	}
+
+	chunks := splitIntoRuneChunks(contentText)
+	for i, piece := range chunks {
+		if !sendChunk(map[string]any{"content": piece}, i == len(chunks)-1) {
 			return
 		}
 	}
 
-	if len(chunks) == 0 {
-		base := map[string]any{
-			"id":      "chatcmpl-" + requestID,
-			"object":  "chat.completion.chunk",
-			"created": createdTS,
-			"model":   model,
-			"choices": []any{map[string]any{
-				"index": 0,
-				"delta": map[string]any{"role": "assistant", "content": ""},
-				"finish_reason": "stop",
-			}},
-		}
-		sw.write(sseLine(base))
+	if len(chunks) == 0 && reasoningText == "" {
+		sendChunk(map[string]any{"content": ""}, true)
+	} else if len(chunks) == 0 {
+		sendChunk(map[string]any{"content": ""}, true)
 	}
 
 	sw.write("data: [DONE]\n\n")
 }
 
-func firstChoiceContent(oai map[string]any) string {
+func firstChoiceField(oai map[string]any, field string) string {
 	choices, ok := oai["choices"].([]any)
 	if !ok || len(choices) == 0 {
 		return ""
@@ -136,8 +140,16 @@ func firstChoiceContent(oai map[string]any) string {
 	if !ok {
 		return ""
 	}
-	if c, ok := msg["content"].(string); ok {
+	if c, ok := msg[field].(string); ok {
 		return c
 	}
 	return ""
+}
+
+func firstChoiceContent(oai map[string]any) string {
+	return firstChoiceField(oai, "content")
+}
+
+func firstChoiceReasoning(oai map[string]any) string {
+	return firstChoiceField(oai, "reasoning_content")
 }
