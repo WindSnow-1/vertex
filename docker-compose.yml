@@ -1,0 +1,8 @@
+services:
+  vertex-proxy:
+    build: .
+    ports:
+      - "2156:2156"
+    volumes:
+      - ./config:/app/config
+    restart: always

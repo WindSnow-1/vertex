@@ -42,7 +42,7 @@ var (
 )
 
 func fileDir() string {
-	return "config"
+	return filepath.Join(config.ExeDir(), "config")
 }
 
 func ensureLoaded() {

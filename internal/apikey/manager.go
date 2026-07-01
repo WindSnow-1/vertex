@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"vertex/internal/config"
 )
 
 type Entry struct {
@@ -28,7 +30,7 @@ func NewManager() *Manager {
 }
 
 func keysPath() string {
-	return filepath.Join("config", "keys.json")
+	return filepath.Join(config.ExeDir(), "config", "keys.json")
 }
 
 func (m *Manager) Load() {

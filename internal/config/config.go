@@ -52,11 +52,19 @@ var (
 	cached *AppConfig
 )
 
+func ExeDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	return filepath.Dir(exe)
+}
+
 func configPath() string {
 	if p := os.Getenv("VERTEX_CONFIG"); p != "" {
 		return p
 	}
-	return filepath.Join("config", "config.json")
+	return filepath.Join(ExeDir(), "config", "config.json")
 }
 
 func Path() string { return configPath() }

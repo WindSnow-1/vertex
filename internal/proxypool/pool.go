@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/net/proxy"
+
+	"vertex/internal/config"
 )
 
 type Proxy struct {
@@ -48,13 +50,7 @@ func proxiesPath() string {
 	if p := os.Getenv("VERTEX_PROXIES"); p != "" {
 		return p
 	}
-	if exe, err := os.Executable(); err == nil {
-		p := filepath.Join(filepath.Dir(exe), "config", "proxies.json")
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return filepath.Join("config", "proxies.json")
+	return filepath.Join(config.ExeDir(), "config", "proxies.json")
 }
 
 func load() {

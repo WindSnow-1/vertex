@@ -47,13 +47,7 @@ func modelsPath() string {
 	if p := os.Getenv("VERTEX_MODELS"); p != "" {
 		return p
 	}
-	if exe, err := os.Executable(); err == nil {
-		p := filepath.Join(filepath.Dir(exe), "config", "models.json")
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return filepath.Join("config", "models.json")
+	return filepath.Join(ExeDir(), "config", "models.json")
 }
 
 func loadModelsFile() *ModelsConfig {
